@@ -244,7 +244,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // creates a 2 element double vector.
 
   vector<double> result;
-  result.push_back(solution.x[delta_start] / Lf);
+  result.push_back(solution.x[delta_start]);
   result.push_back(solution.x[a_start]);
 
   for(int i = 0; i < N - 1; i++) {
