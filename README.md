@@ -5,6 +5,8 @@ Self-Driving Car Engineer Nanodegree Program
 
 ## Solution details
 
+The result of implementing the solution could be found [here](https://youtu.be/_QDy-cHXgRo).
+
 ### Model description
 The model used in the project is the kinematic bicycle model, which ignores
 tire forces, gravity, mass and air resistance.
