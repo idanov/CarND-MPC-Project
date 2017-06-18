@@ -3,6 +3,110 @@ Self-Driving Car Engineer Nanodegree Program
 
 ---
 
+## Solution details
+
+### Model description
+The model used in the project is the kinematic bicycle model, which ignores
+tire forces, gravity, mass and air resistance.
+
+The model consists of state, actuators, errors and update equations.
+The state consists of:
+```
+x, y -> the location of the vehicle
+psi -> the orientation of the vehicle
+v -> the speed of the vehicle along the current orientation
+```
+The actuators are:
+
+```
+delta -> the steering angle
+a -> the acceleration of the vehicle
+```
+
+The error measures are:
+
+```
+cte -> the cross-track error, the distance of the vehicle to the desired position
+epsi -> orientation error, the difference between the desired orientation and the current orientation
+```
+
+The model also has update equations:
+```
+x[t + 1] = x[t] + v[t] * cos(psi[t]) * dt;
+y[t + 1] = y[t] + v[t] * sin(psi[t]) * dt;
+psi[t + 1] = psi[t] - (v[t] / Lf) * delta[t] * dt;
+v[t + 1] = v[t] + a[t] * dt;
+cte[t + 1] = (f(x[t]) - y[t]) + v[t] * epsi[t] * dt;
+epsi[t + 1] = (psi[t] - psides[t]) - (v[t] / Lf) * delta[t] * dt;
+```
+where `t` is the current time step and `t + 1` is the predicted one, which is to happen after `dt` time.
+`Lf` is the distance between the center of mass of the vehicle and the front wheels and represents
+the maneuverability of the vehicle. `f(x[t])` is the target trajectory of the vehicle, evaluated at time `t`.
+`psides[t]` is the desired orientation of the vehicle at time `t`.
+
+The update equations are used in setting up the constraints for the optimization problem in `FG_eval`.
+
+### Optimization problem
+
+For finding the best actuators for following the desired curve, an optimizer is used. The optimizer tries
+to minimize a predefined cost function in `FG_eval`, lines 53 - 70. In order to emphasise the importance of
+some of the variables over the rest of them, different coefficients are used. As it could be seen
+from the source code, we setup the cost function such that the optimizer makes minimizing
+`cte` and `epsi` its highest priority. We also setup the cost function such that the actuators are used
+carefully, without rapid changes between timesteps and possibly not used as frequently. The least important
+contribution to the cost function is the ability of the vehicle to drive at a desired speed set as 
+`ref_v`. That is we prefer the car to stay on track at any cost, we also prefer pleasant rather than
+jerky and surprising moves and we would like to drive at the reference speed, but only when possible.
+
+### Choice of timestep length and duration
+
+Due to the fast changing nature of the environment and the track, we want to predict only `1s` ahead
+since that is enough for good results and the intuition is that humans don't try to predict more than `1s` ahead.
+We also want to smoothen eventual errors caused by the inaccurate model, so we would like to do the predictions
+at intervals of `100ms`. Smaller intervals will be insufficiently small for making decisions and larger ones will
+work with outdated information for too long. Therefore our first choice of `N = 10` and `dt = 0.1` appeared to work
+good for our needs.
+
+### Preprocessing waypoints
+
+The model update equations have this simple form only when the coordinates and the orientation angle are in vehicle
+coordinate system. The coordinates of the waypoints are in global coordinate system, so we need to transform them for
+the sake of simpler calculations later on. The transformation happens as follows:
+
+```
+double dx = ptsx[i] - px;
+double dy = ptsy[i] - py;
+
+ptsx_tr[i] = dx * cos(0 - psi) - dy * sin(0 - psi);
+ptsy_tr[i] = dx * sin(0 - psi) + dy * cos(0 - psi);
+```
+where `ptsx` and `ptsy` are the waypoints, `px` and `py` are the current coordinates of the vehicle in global space
+and `psi` is the current orientation of the vehicle.
+
+### Adding latency
+
+In order to account for latency, before running the optimizer, we can set the initial state of the vehicle to
+what it should look in `x ms` from now according to our model and current understanding of the world and
+if nothing was to change during that time. This prediction is only approximate, but it turns out to work for our needs.
+
+The state approximation is done as follows:
+```
+double x_latency = v * latency;
+double psi_latency = -(v / Lf) * delta * latency;
+double v_latency = v + acceleration * latency;
+```
+
+The initial state then is:
+```
+state << x_latency, 0, psi_latency, v_latency, cte, epsi;
+```
+instead of
+```
+state << 0, 0, 0, v, cte, epsi;
+```
+
+---
+
 ## Dependencies
 
 * cmake >= 3.5
